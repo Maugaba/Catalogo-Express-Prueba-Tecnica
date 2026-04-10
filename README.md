@@ -1,82 +1,95 @@
 # Catalogo Express
 
-Aplicacion Android nativa en Kotlin que consume un catalogo remoto, calcula un score por item, ordena la lista por relevancia y permite navegar de listado a detalle.
+Catalogo Express es una aplicación Android nativa desarrollada en Kotlin. El objetivo fue construir un catálogo simple pero mantenible, con una pantalla de listado y una de detalle, consumiendo datos remotos, calculando un score por producto y evitando acoplar la UI directamente a la respuesta del backend.
 
-## Caracteristicas
+## Alcance
 
-- Arquitectura por capas con `ViewModel`, `Repository` y casos de uso.
-- Navegacion con `Fragments`.
-- Pantalla de listado implementada con Jetpack Compose.
-- Pantalla de detalle implementada con vistas nativas.
-- Consumo de API con Retrofit + OkHttp.
-- Persistencia local con Room para cache.
-- Manejo de estados `loading`, `success` y `error`.
-- Orden por `score` descendente.
+- Listado de productos con imagen, título, precio, estado y score.
+- Detalle del producto seleccionado.
+- Ordenamiento descendente por score.
+- Consumo de API remota con capa de datos separada de la UI.
+- Persistencia local para fallback básico ante fallos de red.
+- Navegación nativa con `Fragments`.
+- Uso de Jetpack Compose en la pantalla principal.
 
-## API usada
+## Stack técnico
 
-- Base remota: `https://fakestoreapiserver.reactbd.org/api/products`
+- Kotlin
+- Android SDK
+- Jetpack Compose
+- Fragments + Navigation
+- ViewModel
+- Retrofit + OkHttp
+- Room
+- Coil
 
-## Compilacion
+## Fuente de datos
 
-Desde la raiz del proyecto:
+API utilizada:
+
+- `https://fakestoreapiserver.reactbd.org/api/products`
+
+## Compilación
+
+Desde la raíz del proyecto:
 
 ```bash
 ./gradlew assembleDebug
 ./gradlew assembleRelease
 ```
 
-En Windows PowerShell tambien puedes usar:
+En PowerShell:
 
 ```powershell
 .\gradlew.bat assembleDebug
 .\gradlew.bat assembleRelease
 ```
 
-## Versiones usadas
+Para instalar la build debug en un dispositivo conectado:
+
+```powershell
+.\gradlew.bat installDebug
+```
+
+## Versiones utilizadas
 
 - Android Gradle Plugin: `9.0.1`
 - Gradle: `9.2.1`
 - Kotlin: `2.0.21`
-- compileSdk: `35`
-- targetSdk: `35`
+- compileSdk: `36`
+- targetSdk: `36`
 - minSdk: `24`
 
-## Librerias principales
+## Validaciones ejecutadas
 
-- Retrofit
-- OkHttp Logging Interceptor
-- Room
-- Coil
-- Jetpack Compose
-- Navigation Fragment
-- Lifecycle ViewModel
+- `.\gradlew.bat assembleDebug`
+- `.\gradlew.bat assembleRelease`
+- `.\gradlew.bat testDebugUnitTest`
 
-## Estructura
+## Estructura general
 
-- `data/remote`: cliente HTTP, datasource y DTOs.
-- `data/local`: Room cache.
-- `data/repository`: repositorio y mappers.
+- `data/remote`: servicio HTTP, DTOs y acceso remoto.
+- `data/local`: base local con Room.
+- `data/repository`: integración entre remoto, cache y normalización.
 - `domain/model`: modelo de producto.
-- `domain/usecase`: casos de uso y score.
+- `domain/usecase`: lógica puntual de consulta y score.
 - `ui/list`: listado en Compose.
 - `ui/detail`: detalle nativo.
-- `ui/common`: formateadores, tema y factory.
+- `ui/common`: utilidades compartidas de presentación.
 
-## Decisiones tecnicas
+## Decisiones técnicas
 
-- Se usa `BuildConfig` para diferenciar `debug` y `release`.
-- `debug` habilita logging HTTP y usa una base URL raiz con path configurable.
-- `release` usa una base URL mas cerrada y sin logging de red.
-- La cache local permite fallback cuando la red falla.
-- El score se calcula fuera de UI para mantener una capa de datos clara.
+- La app se construyó con una arquitectura simple por capas para mantener separado acceso a datos, lógica y presentación.
+- El score se calcula fuera de la UI, durante la transformación del dato, para no repetir lógica en pantalla.
+- Se diferenciaron variantes `debug` y `release` usando `BuildConfig`.
+- En `debug` se habilitó logging HTTP; en `release`, no.
+- Room se utiliza como cache local para mejorar resiliencia frente a fallos de red.
 
-## Documentacion adicional
+## Documentación complementaria
 
-Revisar `DECISIONES.md` para:
+En `DECISIONES.md` se documentan:
 
-- manejo de token
-- normalizacion del score
-- resiliencia y errores
-- diferencias entre ambientes
-- estrategia de entrega a QA
+- arquitectura adoptada
+- tradeoffs tomados por tiempo
+- mejoras futuras
+- criterios de backend y nube

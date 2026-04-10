@@ -1,118 +1,33 @@
 # DECISIONES
 
-## 1. Arquitectura
+## Arquitectura usada
 
-Se implemento una arquitectura simple y mantenible:
+La aplicación se resolvió con una arquitectura por capas simple y clara: `ui`, `data` y `domain`. En presentación usé `Fragments`, `ViewModel` y estados `loading / success / error`. En datos, centralicé el acceso en un `Repository`, apoyado por una fuente remota con Retrofit y una cache local con Room. La lógica de cálculo del `score` y la normalización del dato no quedó en la UI, sino antes de exponer el modelo a pantalla.
 
-- `ViewModel` para manejar estado de UI.
-- `Repository` como unico punto de acceso a datos.
-- `RemoteDataSource` para red.
-- `Room` para persistencia local.
-- Casos de uso para desacoplar la logica de consulta.
-
-La UI no consume datos hardcodeados. Todo llega desde la capa de datos y pasa por normalizacion antes de mostrarse.
-
-## 2. Normalizacion del score
-
-Formula requerida:
+Para el cálculo del score apliqué la fórmula pedida:
 
 ```text
 score = (rating * ln(stock + 1)) / max(price, 1)
 ```
 
-Reglas aplicadas:
+Antes de calcularlo normalicé los valores para tolerar vacíos, nulos o parseos inválidos. Si `price`, `rating` o `stock` no son válidos, se reemplazan por valores seguros. El estado del producto también se deriva desde `stock`, para no depender de un campo externo adicional.
 
-- `id`: si falla el parseo, se usa `0`.
-- `title`: si llega vacio o nulo, se usa `Sin titulo`.
-- `price`: se parsea a `Double`; si falla, se usa `0.0`.
-- `rating`: se parsea a `Double`; si falla, se usa `0.0` y luego se limita al rango `0.0..5.0`.
-- `stock`: se parsea a `Int`; si falla, se usa `0`.
-- `image`: si no existe, se deja vacia y la UI tolera ese caso.
-- `status`: se deriva de `stock`.
+## Tradeoffs por tiempo
 
-Estados:
+Por tiempo prioricé una base sólida y compilable antes que sumar más complejidad. Dejé Compose solo en la pantalla de listado y mantuve el detalle con vistas nativas, porque así cumplía el requisito técnico sin forzar una migración completa. También opté por una inyección de dependencias manual con un `AppContainer`, suficiente para este alcance y más rápida de dejar estable que incorporar Hilt.
 
-- `stock <= 0`: `Sin stock`
-- `stock in 1..10`: `Pocas unidades`
-- `stock > 10`: `Disponible`
+En persistencia elegí Room como cache simple de lectura, sin sincronización avanzada ni estrategia de invalidación elaborada. El manejo offline queda cubierto en el caso más útil para la prueba: si falla la red, se intenta responder con datos locales y, si no existen, se informa el error con opción de reintento.
 
-La lista se ordena por `score` descendente antes de llegar a UI.
+## Mejoras futuras
 
-## 3. Token y autenticacion
+Si este proyecto continuara, el siguiente paso natural sería unificar toda la UI en Compose, agregar paginación real, filtros y búsqueda. También convendría incorporar una estrategia de refresco más explícita para la cache, manejo de estados de red más granular y tests de integración para repository y navegación.
 
-No se implemento autenticacion porque no era requerida funcionalmente, pero si se define la estrategia:
+En una segunda iteración también sumaría inyección con Hilt, placeholders/estados vacíos más trabajados, observabilidad básica y una definición más estricta del contrato backend para evitar normalizaciones defensivas excesivas en cliente.
 
-- Preferiria JWT de corta vida.
-- El token de acceso no iria en SharedPreferences plano.
-- Para almacenamiento seguro usaria `EncryptedSharedPreferences` o `DataStore` protegido con Android Keystore segun el contexto.
-- Un `OkHttp Interceptor` seria el lugar adecuado para adjuntar el token al cliente HTTP.
-- La renovacion del token se resolveria con un autenticador o flujo dedicado de refresh token.
+## Decisiones de nube y backend
 
-## 4. Red, timeout y resiliencia
+Para esta entrega usé una API pública como fuente de datos y diferencié `debug` y `release` por ambiente usando `BuildConfig`, con logging HTTP habilitado solo en `debug`. En un escenario real, mantendría la `baseUrl` por ambiente y separaría al menos desarrollo, QA y producción.
 
-Se implementaron timeouts en OkHttp:
+Si el backend requiriera autenticación, usaría JWT de corta vida y almacenaría el token de forma segura, idealmente apoyado en Android Keystore. La inyección del token iría en un interceptor de OkHttp y el refresh se manejaría fuera de la UI. Del lado de resiliencia, dejaría definidos timeouts, códigos de error esperados y contratos de respuesta consistentes para reducir lógica defensiva en la app.
 
-- `connectTimeout = 15s`
-- `readTimeout = 15s`
-- `writeTimeout = 15s`
-- `callTimeout = 20s`
-
-Errores tipificados:
-
-- timeout
-- offline o fallo de red
-- error backend HTTP
-- not found
-- unknown
-
-Estrategia:
-
-- Si la llamada remota funciona, se actualiza Room.
-- Si falla la red y hay cache, se devuelve cache local.
-- Si falla la red y no hay cache, la UI entra en estado `error`.
-- La UI expone reintento manual.
-
-## 5. Ambientes
-
-Se diferenciaron dos ambientes:
-
-- `debug`
-- `release`
-
-Diferencias:
-
-- `debug` usa logging HTTP con `HttpLoggingInterceptor`.
-- `release` desactiva el logging.
-- Ambos usan `BuildConfig` para resolver `BASE_URL` y `PRODUCTS_PATH`.
-
-Para demostrar configuracion por ambiente:
-
-- `debug` usa base URL raiz y path `api/products`.
-- `release` usa base URL con `/api/` y path `products`.
-
-## 6. Release y QA
-
-Estrategia de entrega a QA:
-
-1. Generar `assembleRelease`.
-2. Validar smoke test basico en dispositivo fisico o emulador.
-3. Compartir APK o AAB segun el flujo del equipo.
-4. Adjuntar changelog corto y riesgos conocidos.
-
-Diferencias practicas entre builds:
-
-- `debug`: mas util para desarrollo, con logging y sufijo de version.
-- `release`: pensada para validar entrega, sin logging de red y con configuracion estable.
-
-## 7. Librerias externas usadas
-
-- Retrofit
-- OkHttp
-- Coil
-- Room
-
-Todas tienen uso real en la implementacion:
-
-- Retrofit/OkHttp para consumir la API.
-- Coil para cargar imagenes.
-- Room para cache local.
+Para entrega a QA, generaría una build `release` firmada para distribución interna y mantendría `debug` como variante de desarrollo. Esa separación permite validar comportamiento cercano a producción sin perder trazabilidad durante implementación y pruebas.
